@@ -1,15 +1,15 @@
 # Script owner: Marie Pittet
 # Date: 13.01.2026
 
-# PROJECT: Power Analysis for predictive modeling (Food cravings)
-# OBJECTIVE: Determine optimal sample size (N) by finding where accuracy plateaus.
-# This script: 
-#    - simulates N participants x 24 items (Long format).
-#    - 80 Predictors: A mix of traits, task metrics, and random noise.
-#    - uses participant-centered outcomes to predict relative cravings
-#    - trains 4 models (Elastic Net, Random Forest, XGBoost, Neural Net) against 
-#      a shuffled baseline.
-#    - generates learning curves
+# This script was written in te context of sample size planning for
+# predictive modeling with hierarchical / repeated-measures data.
+#
+# It simulates: N participants × K items (long format), with mixed predictor types
+# (person-level covariates, item-level/task-like features, and noise variables),
+# then evaluates out-of-sample performance using a participant-level split to
+# prevent leakage.
+#
+# Note: All data are synthetic; parameter values are illustrative.
 
 
 # Set-up ------------------------------------------------------------------
@@ -20,12 +20,12 @@ pacman::p_load(tidyverse, glmnet, ranger, xgboost, nnet, scales, ggplot)
 # Generating datasets (function)-------------------------------------------
 gen_data <- function(n_subs, n_items=24) {
   
-  # Person predictors (10 traits/states per person (could be impulsivity, hunger, anxiety...) that would be predictive)
+  # Person predictors (10 traits/states per person)
   person_traits <- matrix(rnorm(n_subs * 10), ncol=10)
   colnames(person_traits) <- paste0("Trait_", 1:10)
   subjects <- data.frame(ID = 1:n_subs, person_traits)
   
-  # Item predictors (each person sees 24 items)
+  # Item predictors (each person sees n items)
   grid <- expand.grid(ID = subjects$ID, Item = 1:n_items)
   
   # Simulating 20 task metrics that are actually predictive (like RTs, accuracy, etc)
@@ -36,7 +36,7 @@ gen_data <- function(n_subs, n_items=24) {
   df <- bind_cols(grid, as.data.frame(item_metrics)) %>%
     left_join(subjects, by = "ID")
   
-  # We add 50 noise random variables (which will likely be the case in our study, a blend of unuseful personality and task metrics)
+  # We add 50 noise random variables (which is often the case in psychological studies), a blend of unuseful personality and task metrics)
   noise_matrix <- matrix(rnorm(nrow(df) * 50), ncol=50)
   colnames(noise_matrix) <- paste0("Noise_", 1:50)
   df <- bind_cols(df, as.data.frame(noise_matrix))
@@ -52,7 +52,7 @@ gen_data <- function(n_subs, n_items=24) {
   # sd=1.2 puts us in the 0.20 R2 range
   df$y_raw <- signal + rnorm(nrow(df), sd=1.2)
   
-  # Scaling y to have the relative preference and not absolute. Removes leniency bias.
+  # Scaling y to have the relative y outcome and not absolute. Removes personal bias.
   df <- df %>% 
     group_by(ID) %>% 
     mutate(y = as.numeric(scale(y_raw, scale=FALSE))) %>% 
@@ -69,7 +69,7 @@ gen_data <- function(n_subs, n_items=24) {
     # generating the data for n
     df <- gen_data(n)
   
-  # Train-test Split (py people to avoid people leakage)
+  # Train-test split (py people to avoid people leakage)
   train_ids <- sample(unique(df$ID), 0.8 * n)
   train <- df %>% filter(ID %in% train_ids)
   test  <- df %>% filter(!ID %in% train_ids)
@@ -157,4 +157,5 @@ ggplot(results_long, aes(x=N, y=R2, color=Model)) +
        y = "Predictive Accuracy (R²)", 
        x = "Number of Participants") +
   theme_minimal() +
+
   theme(legend.position = "right")
