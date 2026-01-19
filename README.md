@@ -4,6 +4,7 @@ This repository contains an simulation that illustrates sample size planning for
 Datasets in this code are synthetic.
 
 **What does this thing do**
+
 The script: 
 
 - generates a synthetic hierarchical (repeated-measures) dataset in long format with N participants, K items, a mix of predictors (participant-level and item-level predictors, some noise variables to stress-test our algorithm a little bit and to reflect real psychological experiments).
